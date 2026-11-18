@@ -1,0 +1,51 @@
+name: GRANDZERO Stage A External Replay
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external-lean4331-replay:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Record independent runner OS & verify frozen ZIP SHA-256 directly in shell
+        run: |
+          set -euo pipefail
+          cat /etc/os-release
+          uname -a
+          echo "9755ec152989979c8c519b54261c88cbf8aa46b84757636d4212b68dc2388d51  GRANDZERO_STAGE_A_M1P0_R3_CLEANROOM_SOURCE_ARCHIVE.zip" | sha256sum -c -
+
+      - name: Install elan & exact Lean 4.33.1 toolchain
+        run: |
+          set -euo pipefail
+          curl https://elan.lean-lang.org/elan-init.sh -sSf | sh -s -- -y --default-toolchain leanprover/lean4:v4.33.1
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/lean" --version
+          "$HOME/.elan/bin/lake" --version
+
+      - name: Run Hardened Stage A Replay Verifier (v2)
+        run: |
+          set -euo pipefail
+          python3 verify_stage_a_external_replay_v2.py
+
+      - name: Print Receipt to Raw GitHub Actions Step Log
+        if: always()
+        run: |
+          if [ -f STAGE_A_EXTERNAL_REPLAY_RECEIPT.md ]; then
+            cat STAGE_A_EXTERNAL_REPLAY_RECEIPT.md
+          fi
+
+      - name: Upload Stage A External Replay Receipt Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage-a-external-replay-receipt-run-${{ github.run_id }}
+          path: STAGE_A_EXTERNAL_REPLAY_RECEIPT.md
+          if-no-files-found: error
